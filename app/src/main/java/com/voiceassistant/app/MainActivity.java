@@ -144,11 +144,23 @@ public class MainActivity extends AppCompatActivity {
                 viewModel.startRecognition();
             }
         });
-        
+
         // 清除历史按钮
         btnClearHistory.setOnClickListener(v -> {
             viewModel.clearHistory();
             Toast.makeText(this, "历史记录已清除", Toast.LENGTH_SHORT).show();
+        });
+
+        // 语言切换按钮
+        tvLanguage.setOnClickListener(v -> {
+            String currentLang = viewModel.getCurrentLanguage().getValue();
+            if ("zh-CN".equals(currentLang)) {
+                viewModel.setLanguage("en-US");
+                Toast.makeText(this, "已切换到英文识别", Toast.LENGTH_SHORT).show();
+            } else {
+                viewModel.setLanguage("zh-CN");
+                Toast.makeText(this, "已切换到中文识别", Toast.LENGTH_SHORT).show();
+            }
         });
     }
     
@@ -225,4 +237,4 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
         // ViewModel会自动清理资源
     }
-} 
+}
