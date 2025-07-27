@@ -4,6 +4,12 @@ import android.content.Context;
 import android.util.Log;
 
 import com.voiceassistant.app.audio.AudioRecorder;
+import com.voiceassistant.app.speech.ServerSpeechRecognizer;
+import com.voiceassistant.app.speech.VoskSpeechRecognizer;
+import java.io.IOException;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 /**
  * 语音识别管理器
@@ -55,7 +61,11 @@ public class SpeechManager {
         void onRecognitionEnded();
     }
     
+    private static final String HEALTH_CHECK_URL = "http://127.0.0.1:8000/health";
+    private OkHttpClient client;
+
     public SpeechManager(Context context) {
+        this.client = new OkHttpClient();
         this.context = context;
         this.audioRecorder = new AudioRecorder();
         this.speechRecognizer = new VoskSpeechRecognizer(context);
@@ -134,10 +144,52 @@ public class SpeechManager {
     }
     
     /**
+     * 检查服务端健康状态
+     */
+    private boolean checkServerHealth() {
+        try {
+            Request request = new Request.Builder()
+                    .url(HEALTH_CHECK_URL)
+                    .get()
+                    .build();
+
+            Response response = client.newCall(request).execute();
+            if (response.isSuccessful() && response.body() != null) {
+                String responseBody = response.body().string();
+                Log.d(TAG, "Health check response: " + responseBody);
+                // 简单检查响应是否包含成功状态
+                return responseBody.contains("{\"status\": \"ok\"") ||
+                        responseBody.contains("服务正常运行中");
+            }
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to check server health", e);
+        }
+        return false;
+    }
+
+    /**
+     * 根据服务端状态选择合适的识别器
+     */
+    private void selectRecognizer() {
+        boolean isServerAvailable = checkServerHealth();
+        if (isServerAvailable) {
+            // 服务端可用，使用服务端识别器
+            Log.d(TAG, "Server is available, switching to ServerSpeechRecognizer");
+            switchRecognizer(new ServerSpeechRecognizer(context));
+        } else {
+            // 服务端不可用，使用本地Vosk识别器
+            Log.d(TAG, "Server is not available, switching to VoskSpeechRecognizer");
+            switchRecognizer(new VoskSpeechRecognizer(context));
+        }
+    }
+
+    /**
      * 开始语音识别
      * @return 是否成功开始
      */
     public boolean startRecognition() {
+        // 选择合适的识别器
+        selectRecognizer();
         if (!isInitialized) {
             Log.e(TAG, "Speech manager not initialized");
             if (listener != null) {
@@ -329,4 +381,4 @@ public class SpeechManager {
         isInitialized = false;
         Log.d(TAG, "Speech manager released");
     }
-} 
+}
