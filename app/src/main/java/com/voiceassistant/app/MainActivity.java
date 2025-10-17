@@ -234,15 +234,6 @@ public class MainActivity extends AppCompatActivity {
     
     @Override
     protected void onDestroy() {
-        // 在onDestroy中尝试更新UI
-        if (tvStatus != null) {
-            tvStatus.setText("正在关闭...");  // 在Activity销毁时更新UI会导致崩溃
-        }
-
-        // 访问对象
-        String text = viewModel.getCurrentText().getValue();
-        int length = text.length();  // 如果text为null，这里会抛出NullPointerException
-
         super.onDestroy();
         // ViewModel会自动清理资源
     }
