@@ -34,6 +34,7 @@ public class MainViewModel extends AndroidViewModel {
     private volatile boolean shouldContinueRecognition = false;
     // 会话缓冲区：聚合一次会话内的所有最终结果
     private StringBuilder sessionBuffer = new StringBuilder();
+    private final Object sessionBufferLock = new Object();
     
     /**
      * 识别结果数据类
@@ -96,10 +97,12 @@ public class MainViewModel extends AndroidViewModel {
                 partialText.postValue("");
                 
                 // 追加到会话缓冲
-                if (sessionBuffer.length() > 0) {
-                    sessionBuffer.append('\n');
+                synchronized (sessionBufferLock) {
+                    if (sessionBuffer.length() > 0) {
+                        sessionBuffer.append('\n');
+                    }
+                    sessionBuffer.append(finalResult);
                 }
-                sessionBuffer.append(finalResult);
             }
             
             @Override
@@ -131,11 +134,14 @@ public class MainViewModel extends AndroidViewModel {
                     });
                 } else {
                     // 会话结束，若有内容则一次性写入历史
-                    String aggregated = sessionBuffer.toString();
+                    String aggregated;
+                    synchronized (sessionBufferLock) {
+                        aggregated = sessionBuffer.toString();
+                        sessionBuffer.setLength(0);
+                    }
                     if (!aggregated.isEmpty()) {
                         addToHistory(aggregated);
                     }
-                    sessionBuffer.setLength(0);
                 }
             }
         });
@@ -154,7 +160,9 @@ public class MainViewModel extends AndroidViewModel {
         if (!wasContinuing) {
             currentText.postValue("");
             partialText.postValue("");
-            sessionBuffer.setLength(0);
+            synchronized (sessionBufferLock) {
+                sessionBuffer.setLength(0);
+            }
         }
         if (speechManager != null) {
             boolean success = speechManager.startRecognition();
