@@ -1,7 +1,6 @@
 package com.voiceassistant.app;
 
 import android.Manifest;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.view.View;
@@ -139,9 +138,14 @@ public class MainActivity extends AppCompatActivity {
                 viewModel.getIsRecognizing().getValue()) {
                 // 正在识别，停止识别
                 viewModel.stopRecognition();
+                // 清空识别结果
+                tvCurrentText.setText("点击下方按钮开始语音识别...");
+                tvPartialText.setVisibility(View.GONE);
             } else {
-                // 开始识别
-                viewModel.startRecognition();
+                // 开始识别，避免阻塞UI线程
+                new Thread(() -> {
+                    viewModel.startRecognition();
+                }).start();
             }
         });
 

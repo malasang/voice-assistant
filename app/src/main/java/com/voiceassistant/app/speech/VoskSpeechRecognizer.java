@@ -12,9 +12,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Arrays;
-import java.util.List;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -122,8 +121,15 @@ public class VoskSpeechRecognizer implements SpeechRecognizer {
         }
         
         try {
-            // 重置识别器
-            recognizer = new Recognizer(model, 16000.0f);
+            // 如果识别器不存在或需要重新创建，则创建新的
+            if (recognizer == null) {
+                recognizer = new Recognizer(model, 16000.0f);
+                Log.d(TAG, "Created new Vosk recognizer");
+            } else {
+                // 重置现有识别器
+                recognizer.reset();
+                Log.d(TAG, "Reset existing Vosk recognizer");
+            }
             
             if (listener != null) {
                 listener.onRecognitionStarted();

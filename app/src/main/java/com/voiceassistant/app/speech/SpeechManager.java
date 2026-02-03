@@ -4,9 +4,9 @@ import android.content.Context;
 import android.util.Log;
 
 import com.voiceassistant.app.audio.AudioRecorder;
-import com.voiceassistant.app.speech.ServerSpeechRecognizer;
-import com.voiceassistant.app.speech.VoskSpeechRecognizer;
+
 import java.io.IOException;
+
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -68,8 +68,19 @@ public class SpeechManager {
         this.client = new OkHttpClient();
         this.context = context;
         this.audioRecorder = new AudioRecorder();
+        // 默认使用Vosk识别器，避免初始化时的网络检查
         this.speechRecognizer = new VoskSpeechRecognizer(context);
         
+        // 异步检查服务端可用性，但不阻塞初始化
+        new Thread(() -> {
+            boolean isServerAvailable = checkServerHealth();
+            if (isServerAvailable && speechRecognizer == null) {
+                // 如果服务端可用且当前识别器未设置，则切换到服务端识别器
+                Log.d(TAG, "Server is available, switching to ServerSpeechRecognizer");
+                switchRecognizer(new ServerSpeechRecognizer(context));
+            }
+        }).start();
+
         // 设置音频数据监听器
         audioRecorder.setAudioDataListener(new AudioRecorder.AudioDataListener() {
             @Override
@@ -188,8 +199,6 @@ public class SpeechManager {
      * @return 是否成功开始
      */
     public boolean startRecognition() {
-        // 选择合适的识别器
-        selectRecognizer();
         if (!isInitialized) {
             Log.e(TAG, "Speech manager not initialized");
             if (listener != null) {
