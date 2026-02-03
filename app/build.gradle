@@ -4,16 +4,43 @@ plugins {
 
 android {
     namespace 'com.voiceassistant.app'
-    compileSdk 34
+    compileSdk 35  // 更新到35以支持最新的16KB页面大小要求
 
     defaultConfig {
         applicationId "com.voiceassistant.app"
         minSdk 21
-        targetSdk 34
+        targetSdk 35  // 更新target SDK以支持16KB页面大小
         versionCode 1
         versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        // 支持16KB页大小
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+        }
+
+        // 外部Native构建选项
+        externalNativeBuild {
+            cmake {
+                cppFlags "-fPIC"
+                arguments "-DANDROID_STL=c++_shared"
+            }
+        }
+    }
+
+    packagingOptions {
+        // 确保native库对齐到16KB边界
+        jniLibs {
+            useLegacyPackaging = false
+            keepDebugSymbols += ['**/*.so']
+        }
+
+        // 处理重复的库文件
+        pickFirsts.add('lib/arm64-v8a/libc++_shared.so')
+        pickFirsts.add('lib/armeabi-v7a/libc++_shared.so')
+        pickFirsts.add('lib/x86/libc++_shared.so')
+        pickFirsts.add('lib/x86_64/libc++_shared.so')
     }
 
     buildTypes {

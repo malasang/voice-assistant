@@ -71,21 +71,25 @@ public class AudioRecorder {
         }
         
         try {
-            // 创建AudioRecord
-            audioRecord = new AudioRecord(
-                MediaRecorder.AudioSource.MIC,
-                SAMPLE_RATE,
-                CHANNEL_CONFIG,
-                AUDIO_FORMAT,
-                bufferSize
-            );
+            // 如果AudioRecord不存在或已释放，则创建新的
+            if (audioRecord == null || audioRecord.getState() != AudioRecord.STATE_INITIALIZED) {
+                // 创建AudioRecord
+                audioRecord = new AudioRecord(
+                    MediaRecorder.AudioSource.MIC,
+                    SAMPLE_RATE,
+                    CHANNEL_CONFIG,
+                    AUDIO_FORMAT,
+                    bufferSize
+                );
             
-            if (audioRecord.getState() != AudioRecord.STATE_INITIALIZED) {
-                Log.e(TAG, "AudioRecord initialization failed");
-                if (audioDataListener != null) {
-                    audioDataListener.onError("音频录制器初始化失败");
+                if (audioRecord.getState() != AudioRecord.STATE_INITIALIZED) {
+                    Log.e(TAG, "AudioRecord initialization failed");
+                    if (audioDataListener != null) {
+                        audioDataListener.onError("音频录制器初始化失败");
+                    }
+                    audioRecord = null;
+                    return false;
                 }
-                return false;
             }
             
             // 开始录制
@@ -125,11 +129,11 @@ public class AudioRecorder {
                 recordingThread = null;
             }
             
-            // 停止AudioRecord
+            // 停止AudioRecord但不释放，准备复用
             if (audioRecord != null) {
                 audioRecord.stop();
-                audioRecord.release();
-                audioRecord = null;
+                // 不释放，保留实例用于下次复用
+                Log.d(TAG, "AudioRecord stopped (instance kept for reuse)");
             }
             
             Log.d(TAG, "Audio recording stopped");
@@ -208,5 +212,19 @@ public class AudioRecorder {
      */
     public void release() {
         stopRecording();
+
+        // 真正释放AudioRecord资源
+        if (audioRecord != null) {
+            try {
+                if (audioRecord.getState() == AudioRecord.STATE_INITIALIZED) {
+                    audioRecord.release();
+                    Log.d(TAG, "AudioRecord released");
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error releasing AudioRecord", e);
+            } finally {
+                audioRecord = null;
+            }
+        }
     }
 } 

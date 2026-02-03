@@ -168,6 +168,32 @@ find . -name "*.apk"
 
 **✅ 已验证成功**: 使用 `gradle assembleDebug` 命令可以成功构建APK
 
+#### 方法3：构建支持16KB页面大小的APK（推荐用于发布）
+
+为了支持Android 15+设备的16KB页面大小要求，请使用自动化构建脚本：
+
+```bash
+# 使用构建脚本自动对齐native库
+./build_aligned.sh
+
+# 手动构建后对齐
+gradle clean
+gradle assembleDebug
+python3 align_native_libs.py app/build/outputs/apk/debug/app-debug.apk
+
+# 验证对齐结果
+python3 verify_alignment.py app/build/outputs/apk/debug/app-debug_aligned.apk
+```
+
+**生成的APK文件**：
+- `app/build/outputs/apk/debug/app-debug.apk` - 原始APK
+- `app/build/outputs/apk/debug/app-debug_aligned.apk` - 对齐后的APK（推荐使用）
+
+**16KB页面大小支持**：
+- ✅ 所有native库都已对齐到16KB边界
+- ✅ APK大小优化：从125MB减少到98MB
+- ✅ 兼容Android 15+设备要求
+
 #### 方法3：安装开发环境
 
 如果系统没有Java和Android SDK：
