@@ -30,6 +30,11 @@ public class MainViewModel extends AndroidViewModel {
     private MutableLiveData<List<RecognitionResult>> recognitionHistory = new MutableLiveData<>(new ArrayList<>());
     private MutableLiveData<String> currentLanguage = new MutableLiveData<>("zh-CN");
     private MutableLiveData<String> recognizerName = new MutableLiveData<>("");
+    // 是否应持续保持识别（由按钮切换控制）
+    private volatile boolean shouldContinueRecognition = false;
+    // 会话缓冲区：聚合一次会话内的所有最终结果
+    private StringBuilder sessionBuffer = new StringBuilder();
+    private final Object sessionBufferLock = new Object();
     
     /**
      * 识别结果数据类
@@ -82,15 +87,22 @@ public class MainViewModel extends AndroidViewModel {
             public void onFinalResult(String finalResult) {
                 Log.d(TAG, "Final result: " + finalResult);
                 
-                // 更新当前文本
-                currentText.postValue(finalResult);
+                // 追加到当前文本
+                String existing = currentText.getValue();
+                if (existing == null || existing.isEmpty()) {
+                    currentText.postValue(finalResult);
+                } else {
+                    currentText.postValue(existing + "\n" + finalResult);
+                }
                 partialText.postValue("");
                 
-                // 添加到历史记录
-                addToHistory(finalResult);
-                
-                // 停止识别
-                stopRecognition();
+                // 追加到会话缓冲
+                synchronized (sessionBufferLock) {
+                    if (sessionBuffer.length() > 0) {
+                        sessionBuffer.append('\n');
+                    }
+                    sessionBuffer.append(finalResult);
+                }
             }
             
             @Override
@@ -112,6 +124,25 @@ public class MainViewModel extends AndroidViewModel {
             public void onRecognitionEnded() {
                 Log.d(TAG, "Recognition ended");
                 isRecognizing.postValue(false);
+                // 若仍需持续识别，则自动重启
+                if (shouldContinueRecognition) {
+                    new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
+                        @Override
+                        public void run() {
+                            startRecognition();
+                        }
+                    });
+                } else {
+                    // 会话结束，若有内容则一次性写入历史
+                    String aggregated;
+                    synchronized (sessionBufferLock) {
+                        aggregated = sessionBuffer.toString();
+                        sessionBuffer.setLength(0);
+                    }
+                    if (!aggregated.isEmpty()) {
+                        addToHistory(aggregated);
+                    }
+                }
             }
         });
         
@@ -123,6 +154,16 @@ public class MainViewModel extends AndroidViewModel {
      * 开始语音识别
      */
     public void startRecognition() {
+        boolean wasContinuing = shouldContinueRecognition;
+        shouldContinueRecognition = true;
+        // 仅在用户新发起会话时清空显示并重置缓冲
+        if (!wasContinuing) {
+            currentText.postValue("");
+            partialText.postValue("");
+            synchronized (sessionBufferLock) {
+                sessionBuffer.setLength(0);
+            }
+        }
         if (speechManager != null) {
             boolean success = speechManager.startRecognition();
             if (!success) {
@@ -135,6 +176,7 @@ public class MainViewModel extends AndroidViewModel {
      * 停止语音识别
      */
     public void stopRecognition() {
+        shouldContinueRecognition = false;
         if (speechManager != null) {
             speechManager.stopRecognition();
         }
